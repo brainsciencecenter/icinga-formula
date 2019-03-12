@@ -1,0 +1,48 @@
+{% if HostCheckType == 'passive' %}
+
+object Host "{{ Host }}" {
+  /* Import the default host template defined in `templates.conf`. */
+  import "generic-passive-host"
+
+
+  /* Set custom attribute `os` for hostgroup assignment in `groups.conf`. */
+  vars.os = "Linux"
+
+  /* Define notification mail attributes for notification apply rules in `notifications.conf`. */
+  vars.notification["mail"] = {
+    /* The UserGroup `icingaadmins` is defined in `users.conf`. */
+    groups = [ "icingaadmins" ]
+  }
+}
+
+
+{% else %}
+
+object Host "{{ Host }}" {
+  /* Import the default host template defined in `templates.conf`. */
+  import "generic-host"
+
+  address = "{{ IPAddress }}"
+
+  /* Set custom attribute `os` for hostgroup assignment in `groups.conf`. */
+  vars.os = "Linux"
+
+  /* Define notification mail attributes for notification apply rules in `notifications.conf`. */
+  vars.notification["mail"] = {
+    /* The UserGroup `icingaadmins` is defined in `users.conf`. */
+    groups = [ "icingaadmins" ]
+  }
+
+}
+
+{% endif %}
+
+{% for ServiceCheckName in ServiceChecks %}
+
+apply Service "{{ ServiceCheckName }}" {
+  import "generic-passive-service"
+  assign where host.name == "{{ Host }}"
+}
+
+{% endfor %}
+
