@@ -8,6 +8,7 @@ import copy
 import socket
 
 def expandServiceChecks(ServiceChecks,Defaults):
+    debug = 0
 
     ExpandedServiceChecks = {}
 
@@ -25,7 +26,9 @@ def expandServiceChecks(ServiceChecks,Defaults):
       # myload:
       #   check_load
       #
-      if (type(Check) is str):
+      if (debug):
+        print("'%s' : '%s' : CheckType = %s" % (ServiceName, Check, type(Check)))
+      if (type(Check) is str or type(Check) is unicode):
         CheckName = Check
         CheckAttributes = { 'check_name': CheckName, 'servicename': 'check type is string'}
 
@@ -67,11 +70,18 @@ def expandServiceChecks(ServiceChecks,Defaults):
           ExpandedServiceChecks[n]['name'] = n
       else:
         ServiceCheck['name'] = ServiceName
+        if (not ('check_name' in ServiceCheck.keys())):
+          ServiceCheck['check_name'] = CheckName
         ExpandedServiceChecks[re.sub('^check_', '', ServiceName)] = ServiceCheck.copy()
 
     return(ExpandedServiceChecks)
 
 def run():
+    global __grains__
+    global __pillar__
+
+    debug = 0
+
     try:
       minion_id = __grains__['id']
     except ValueError:
@@ -150,9 +160,55 @@ def run():
           }
         })
 
+      # Copy in the nagios plugins and supporting scripts
+      if ('icinga-files' in __pillar__.keys()):
+        for File in __pillar__['icinga-files']:
+          HostConfigs.update( {
+            File : {
+              'file.managed' : [
+                { 'source' : 'salt://files%s' % (File) },
+                { 'user' : 'root' },
+                { 'group' : 'root' },
+                { 'mode' : '755' },
+              ]
+            }
+          })
+
+
+      if ('packages' in __pillar__.keys() and 'nagiosplugins' in __pillar__['packages'].keys()):
+        HostConfigs.update( {
+  
+          'nagios-plugins' : {
+            'pkg.installed' : [
+              { 'pkgs' : __pillar__['packages']['nagiosplugins']},
+            ]
+          },
+  
+        })
+
       # Generate cron jobs for passive icinga checks
       if (Host == minion_id):
+        # Add host check
+        CommandToRun = "/usr/local/bin/forwardCheck -H %s" % (Host)
+        StateName = "Icinga-%s-HostCheck" % (Host)
+        HostConfigs.update( {
+          StateName : {
+            'cron.present' : [
+              { 'name' : CommandToRun },
+              { 'identifier': StateName },
+              { 'user': "%s" % ('root')},
+              { 'minute': "%s" % ( '*/5' )},
+              { 'hour': "%s" % ( '*' )},
+              { 'daymonth': "%s" % ( '*' )},
+              { 'month': "%s" % ( '*' )},
+              { 'dayweek': "%s" % ( '*' )},
+            ]
+          }
+        })
+
         for ServiceName, Check in ExpandedServiceChecks.items():
+          if (debug):
+            print("'%s' : '%s'" % (json.dumps(ServiceName), json.dumps(Check)))
           cmd = "missing cmd"
           if ('cmd' in Check.keys()):
             cmd = Check['cmd']
@@ -179,3 +235,24 @@ def run():
 
     return( HostConfigs )
 
+def main():
+  global __pillar__
+  global __grains__
+
+  # Create /tmp/pillar and /tmp/grains with
+  # salt --out=json compute-1-6.chead.uphs.upenn.edu grains.items  > /tmp/grains
+  # salt --out=json compute-1-6.chead.uphs.upenn.edu pillar.items  > /tmp/pillar
+
+  with open('/tmp/pillar') as json_file:  
+    pillar = json.load(json_file)
+  __pillar__ = pillar
+  __pillar__ = pillar['compute-1-6.chead.uphs.upenn.edu']
+
+  with open('/tmp/grains') as json_file:  
+    grains = json.load(json_file)
+  __grains__ = grains['compute-1-6.chead.uphs.upenn.edu']
+
+  run()
+  
+if __name__== "__main__":
+  main()

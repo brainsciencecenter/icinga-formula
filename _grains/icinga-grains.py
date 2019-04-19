@@ -72,8 +72,14 @@ getPublicIPAddress:
 
 """
 
+
 def icinga_grains():
   grains = yaml.load(g)
   icinga = { 'icinga': { 'Defaults': grains }}
+
+  if (os.path.exists('/etc/redhat-release')):
+    icinga['icinga']['Defaults']['default']['command_path'] = '/usr/lib64/nagios/plugins'
+
   return(icinga)
 
+#print(icinga_grains())
