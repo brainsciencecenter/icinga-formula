@@ -8,7 +8,7 @@ import copy
 import socket
 
 def expandServiceChecks(ServiceChecks,Defaults):
-    debug = 0
+    debug = 1
 
     ExpandedServiceChecks = {}
 
@@ -51,17 +51,24 @@ def expandServiceChecks(ServiceChecks,Defaults):
           CheckAttributes = Check[CheckName].copy()
 
 
-      if (CheckName in Defaults.keys()):
-        ServiceCheck = Defaults[CheckName].copy()
-      else:
-        ServiceCheck = Defaults['default'].copy()
+      ServiceCheck = Defaults['default'].copy()
 
       if ('check_type' in CheckAttributes.keys() and CheckAttributes['check_type'] == 'active'):
         pass
       else:
         ServiceCheck.update(Defaults['passive_check'])
 
+      if (CheckName in Defaults.keys()):
+        ServiceCheck.update(Defaults[CheckName])
+        if (debug):
+          print("CheckName in Defaults.keys: '%s' in %s" % (CheckName, ','.join(Defaults.keys())))
+
+      if (debug):
+        print("ServiceCheck: ",ServiceCheck)
+
       ServiceCheck.update(CheckAttributes)
+      if (debug):
+        print("ServiceCheck.update(CheckAttributes): ", ServiceCheck)
 
       if ('name' in CheckAttributes.keys() and type(CheckAttributes['name']) is list):
         for n in CheckAttributes['name']:
@@ -80,7 +87,7 @@ def run():
     global __grains__
     global __pillar__
 
-    debug = 0
+    debug = 1
 
     try:
       minion_id = __grains__['id']
@@ -115,6 +122,17 @@ def run():
       server = {}
 
     HostConfigs = {}
+
+    #
+    # Sometimes you need a host to do active checks
+    # bfb-checks:
+    #   ....
+    # hippogang-nas-checks:
+    #   ....
+    #
+
+    if (debug):
+      print("CheckDefaults: ",CheckDefaults)
 
     for Host, ServiceChecks in p.items():
       ExpandedServiceChecks = expandServiceChecks(ServiceChecks,CheckDefaults)

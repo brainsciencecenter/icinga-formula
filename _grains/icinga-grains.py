@@ -46,6 +46,7 @@ check_http:
   options: " -H {name}"
 
 check_load:
+  minute: '*/5'
   warning: 100,50,5
   critical: 200,100,10
 
